@@ -13,9 +13,10 @@ from livekit.agents import (
     cli,
     metrics,
 )
+
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import cartesia, deepgram, noise_cancellation, openai, silero
+from livekit.plugins import cartesia, deepgram, noise_cancellation, openai, silero, google
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 logger = logging.getLogger("agent")
@@ -62,9 +63,9 @@ async def entrypoint(ctx: JobContext):
     # Set up a voice AI pipeline using OpenAI, Cartesia, Deepgram, and the LiveKit turn detector
     session = AgentSession(
         # any combination of STT, LLM, TTS, or realtime API can be used
-        llm=openai.LLM(model="gpt-4o-mini"),
-        stt=deepgram.STT(model="nova-3", language="multi"),
-        tts=cartesia.TTS(voice="6f84f4b8-58a2-430c-8c79-688dad597532"),
+        llm=google.LLM(model="gemini-1.5-flash"),
+        stt=google.STT(model="chirp_2", location="us-central1"),
+        tts=google.TTS(gender="male", voice_name="en-US-Chirp3-HD-Charon"),
         # use LiveKit's turn detection model
         turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],

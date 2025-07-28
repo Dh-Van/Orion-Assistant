@@ -1,13 +1,13 @@
 import pytest
 from livekit.agents import AgentSession, llm
 from livekit.agents.voice.run_result import mock_tools
-from livekit.plugins import openai
+from livekit.plugins import google
 
 from agent import Assistant
 
 
 def _llm() -> llm.LLM:
-    return openai.LLM(model="gpt-4o-mini")
+    return google.LLM(model="gemini-1.5-flash")
 
 
 @pytest.mark.asyncio
