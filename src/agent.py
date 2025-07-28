@@ -24,9 +24,6 @@ logger = logging.getLogger("agent")
 
 load_dotenv()
 
-creds = json.loads(base64.b64decode(os.getenv("GOOGLE_CREDENTIALS_FILE")))
-
-
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(
@@ -57,6 +54,8 @@ async def entrypoint(ctx: JobContext):
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
+
+    creds = json.loads(base64.b64decode(os.getenv("GOOGLE_CREDENTIALS_FILE")))
 
 
     # Set up a voice AI pipeline using OpenAI, Cartesia, Deepgram, and the LiveKit turn detector
