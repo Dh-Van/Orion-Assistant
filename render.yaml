@@ -5,16 +5,16 @@ services:
   # Change this to the path containing your Dockerfile
   rootDir: .
 
-  name: agent-example
-  runtime: image
+  name: orion-assistant
+  runtime: docker
 
   # Free plan is not available for private services
-  plan: starter
+  plan: free
 
   # Environment variables are stored in a group
   # created in the Render dashboard.
   envVars:
-  - fromGroup: agent-example-env 
+  - fromGroup: livekit-secrets-group 
   region: virginia
 
   # 300s is the standard allowed maximum. Talk to render.com support if you need this increased.
