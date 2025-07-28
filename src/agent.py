@@ -17,12 +17,12 @@ import os
 
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import cartesia, deepgram, noise_cancellation, openai, silero, google
+from livekit.plugins import google
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 logger = logging.getLogger("agent")
 
-load_dotenv(".env.local")
+load_dotenv()
 
 
 class Assistant(Agent):
@@ -65,8 +65,8 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(
         # any combination of STT, LLM, TTS, or realtime API can be used
         llm=google.LLM(model="gemini-1.5-flash"),
-        stt=google.STT(model="chirp_2", location="us-central1", credentials_file=creds),
-        tts=google.TTS(gender="male", voice_name="en-US-Chirp3-HD-Charon", credentials_file=creds),
+        stt=google.STT(model="chirp_2", location="us-central1", credentials_info=creds),
+        tts=google.TTS(gender="male", voice_name="en-US-Chirp3-HD-Charon", credentials_info=creds),
         # use LiveKit's turn detection model
         turn_detection=MultilingualModel(),
     )
