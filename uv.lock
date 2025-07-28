@@ -9,39 +9,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agent-starter-python"
-version = "1.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "flask" },
-    { name = "livekit-agents", extra = ["cartesia", "deepgram", "google", "openai", "silero", "turn-detector"] },
-    { name = "livekit-plugins-noise-cancellation" },
-    { name = "python-dotenv" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "flask", specifier = ">=3.1.1" },
-    { name = "livekit-agents", extras = ["cartesia", "deepgram", "google", "openai", "silero", "turn-detector"], specifier = "~=1.2" },
-    { name = "livekit-plugins-noise-cancellation", specifier = "~=0.2.1" },
-    { name = "python-dotenv" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-]
-
-[[package]]
 name = "aiofiles"
 version = "24.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1965,6 +1932,39 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/32/8e/214fa817f63b9f068519463d8ab46afd5d03b98930c39394a37ae3e741d0/opentelemetry_semantic_conventions-0.56b0.tar.gz", hash = "sha256:c114c2eacc8ff6d3908cb328c811eaf64e6d68623840be9224dc829c4fd6c2ea", size = 124221, upload-time = "2025-07-11T12:23:40.71Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/3f/e80c1b017066a9d999efffe88d1cce66116dcf5cb7f80c41040a83b6e03b/opentelemetry_semantic_conventions-0.56b0-py3-none-any.whl", hash = "sha256:df44492868fd6b482511cc43a942e7194be64e94945f572db24df2e279a001a2", size = 201625, upload-time = "2025-07-11T12:23:25.63Z" },
+]
+
+[[package]]
+name = "orion-assistant"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "flask" },
+    { name = "livekit-agents", extra = ["cartesia", "deepgram", "google", "openai", "silero", "turn-detector"] },
+    { name = "livekit-plugins-noise-cancellation" },
+    { name = "python-dotenv" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "flask", specifier = ">=3.1.1" },
+    { name = "livekit-agents", extras = ["cartesia", "deepgram", "google", "openai", "silero", "turn-detector"], specifier = "~=1.2" },
+    { name = "livekit-plugins-noise-cancellation", specifier = "~=0.2.1" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
 ]
 
 [[package]]
