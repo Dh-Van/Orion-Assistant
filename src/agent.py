@@ -49,11 +49,6 @@ class Assistant(Agent):
 
         return "sunny with a temperature of 70 degrees."
 
-
-def prewarm(proc: JobProcess):
-    proc.userdata["vad"] = silero.VAD.load()
-
-
 async def entrypoint(ctx: JobContext):
     # each log entry will include these fields
     ctx.log_context_fields = {
@@ -68,7 +63,6 @@ async def entrypoint(ctx: JobContext):
         tts=google.TTS(gender="male", voice_name="en-US-Chirp3-HD-Charon"),
         # use LiveKit's turn detection model
         turn_detection=MultilingualModel(),
-        vad=ctx.proc.userdata["vad"],
     )
 
     # To use the OpenAI Realtime API, use the following session setup instead:
@@ -94,11 +88,6 @@ async def entrypoint(ctx: JobContext):
     await session.start(
         agent=Assistant(),
         room=ctx.room,
-        room_input_options=RoomInputOptions(
-            # LiveKit Cloud enhanced noise cancellation
-            # - If self-hosting, omit this parameter
-            # - For telephony applications, use `BVCTelephony` for best results
-        ),
         room_output_options=RoomOutputOptions(transcription_enabled=True),
     )
 
