@@ -1,5 +1,5 @@
 services:
-- type: web
+- type: worker
   repo: https://github.com/dh-van/orion-assistant
 
   # Change this to the path containing your Dockerfile
@@ -21,7 +21,7 @@ services:
   # maxShutdownDelaySeconds: 300
 
   # Sane defaults
-  scaling:
+  # scaling:
     # minInstances: 1
     # maxInstances: 4
     # targetCPUPercent: 60
