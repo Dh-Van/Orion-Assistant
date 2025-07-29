@@ -101,9 +101,4 @@ async def entrypoint(ctx: JobContext):
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(
         entrypoint_fnc=entrypoint,
-        job_memory_warn_mb=0,
-        job_memory_limit_mb=0,
-        num_idle_processes=0,
-        initialize_process_timeout=30.0,
-        shutdown_process_timeout=30.0
     ))
