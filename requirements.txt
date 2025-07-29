@@ -1,0 +1,16 @@
+pipecat-ai[google,daily,silero]
+python-dotenv
+aiohttp
+loguru
+gunicorn
+uvloop
+
+nylas
+google-genai
+instructor
+langchain-google-genai
+
+langchain-community
+chromadb
+pydantic
+
