@@ -15,8 +15,11 @@ To run specific client tests:
 import os
 import asyncio
 import pytest
-from datetime import datetime
+import pytest_asyncio
+from datetime import datetime, timezone
 from typing import List
+import json
+import base64
 from dotenv import load_dotenv
 
 # Load test environment
@@ -36,6 +39,22 @@ NYLAS_API_KEY = os.getenv('NYLAS_API_KEY_TEST', os.getenv('NYLAS_API_KEY'))
 NYLAS_GRANT_ID = os.getenv('NYLAS_GRANT_ID_TEST', os.getenv('NYLAS_GRANT_ID'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY_TEST', os.getenv('GOOGLE_API_KEY'))
 
+# Handle Google credentials from base64
+GOOGLE_CREDENTIALS_B64 = os.getenv('GOOGLE_CREDENTIALS')
+if GOOGLE_CREDENTIALS_B64:
+    try:
+        # Decode and save credentials to a temp file
+        creds_json = base64.b64decode(GOOGLE_CREDENTIALS_B64)
+        creds_dict = json.loads(creds_json)
+        
+        # Write to a temporary credentials file
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(creds_dict, f)
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = f.name
+    except Exception as e:
+        print(f"Failed to decode Google credentials: {e}")
+
 # Test email settings (change these to your test email)
 TEST_EMAIL_TO = os.getenv('TEST_EMAIL_TO', 'test@example.com')
 TEST_EMAIL_FROM = os.getenv('TEST_EMAIL_FROM', 'sender@example.com')
@@ -45,14 +64,14 @@ TEST_EMAIL_FROM = os.getenv('TEST_EMAIL_FROM', 'sender@example.com')
 class TestDailyIntegration:
     """Integration tests for Daily.co client."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def daily_client(self):
         """Create Daily client instance."""
         if not DAILY_API_KEY:
             pytest.skip("DAILY_API_KEY not set")
         return DailyClient(api_key=DAILY_API_KEY)
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def cleanup_rooms(self, daily_client):
         """Cleanup any test rooms after tests."""
         created_rooms = []
@@ -71,7 +90,7 @@ class TestDailyIntegration:
         """Test creating and deleting a room."""
         # Create room
         room_info = await daily_client.create_room(
-            name=f"test-room-{int(datetime.utcnow().timestamp())}",
+            name=f"test-room-{int(datetime.now(timezone.utc).timestamp())}",
             privacy="public"
         )
         
@@ -135,8 +154,8 @@ class TestDailyIntegration:
         """Test creating a room with expiration."""
         # Create room that expires in 5 minutes
         room_info = await daily_client.create_room(
-            name=f"test-exp-room-{int(datetime.utcnow().timestamp())}",
-            exp=int(datetime.utcnow().timestamp()) + 300  # 5 minutes
+            name=f"test-exp-room-{int(datetime.now(timezone.utc).timestamp())}",
+            exp=int(datetime.now(timezone.utc).timestamp()) + 300  # 5 minutes
         )
         
         cleanup_rooms.append(room_info.name)
@@ -233,7 +252,7 @@ class TestNylasIntegration:
     async def test_send_and_read_email(self, nylas_client):
         """Test sending an email and reading it back."""
         # Create unique subject
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now().isoformat()
         subject = f"Integration Test Email - {timestamp}"
         body = f"This is an automated test email sent at {timestamp}"
         
@@ -264,7 +283,7 @@ class TestNylasIntegration:
     async def test_get_email_by_id(self, nylas_client):
         """Test fetching specific email by ID."""
         # First, get some emails
-        emails = nylas_client.read_emails(limit=1)
+        emails = nylas_client.read_emails(limit=100)
         
         if len(emails) == 0:
             pytest.skip("No emails in inbox to test with")
@@ -281,7 +300,7 @@ class TestNylasIntegration:
     @pytest.mark.asyncio
     async def test_email_with_multiple_recipients(self, nylas_client):
         """Test sending email with CC."""
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         
         success = nylas_client.send_email(
             to=[{"name": "Primary", "email": TEST_EMAIL_TO}],
