@@ -1,100 +1,35 @@
 """
-Agent Orchestrator - Coordinates between voice interface and conversation management.
-This is the main entry point that connects Pipecat to our email agent logic.
+Agent Orchestrator using Pipecat's native function calling pattern.
+This follows the standard Pipecat pipeline architecture.
 """
 
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Optional
 from loguru import logger
 
-from pipecat.frames.frames import (
-    Frame, TextFrame, TranscriptionFrame, EndFrame,
-    TTSSpeakFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame,
-    SystemFrame, ErrorFrame
-)
+from pipecat.frames.frames import Frame, TTSSpeakFrame, LLMMessagesFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask, PipelineParams
-from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.transports.base_transport import BaseTransport
+from pipecat.services.llm_service import FunctionCallParams
 
-from .conversation_manager import ConversationManager
-from ..services.intent_recognition import IntentRecognitionService
+from .ai_conversation_manager import AIConversationManager
 from ..services.email_service import EmailService
 from ..voice.voice_interface import VoiceInterface
-from ..models.conversation_state import ConversationPhase
-
-
-class EmailAgentProcessor(FrameProcessor):
-    """
-    Custom frame processor that handles email agent logic.
-    Bridges between Pipecat frames and our conversation manager.
-    """
-    
-    def __init__(
-        self,
-        conversation_manager: ConversationManager,
-        **kwargs
-    ):
-        super().__init__(**kwargs)
-        self.conversation_manager = conversation_manager
-        self._processing = False
-        
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
-        """Process incoming frames from the pipeline."""
-        await super().process_frame(frame, direction)
-        
-        # Handle transcription frames (user speech)
-        if isinstance(frame, TranscriptionFrame):
-            # Ignore interim transcriptions
-            if hasattr(frame, 'is_final') and not frame.is_final:
-                await self.push_frame(frame, direction)
-                return
-                
-            # Avoid processing while already processing
-            if self._processing:
-                logger.debug("Already processing, skipping transcription")
-                await self.push_frame(frame, direction)
-                return
-            
-            try:
-                self._processing = True
-                user_text = frame.text.strip()
-                
-                if user_text:
-                    logger.info(f"Processing user input: {user_text}")
-                    
-                    # Get response from conversation manager
-                    response = await self.conversation_manager.process_user_input(user_text)
-                    
-                    # Create TTS frame for response
-                    if response:
-                        await self.push_frame(TTSSpeakFrame(response))
-                        
-            except Exception as e:
-                logger.error(f"Error processing transcription: {e}")
-                error_response = "I'm sorry, I encountered an error. Could you please repeat that?"
-                await self.push_frame(TTSSpeakFrame(error_response))
-                
-            finally:
-                self._processing = False
-        
-        # Pass through other frames
-        else:
-            await self.push_frame(frame, direction)
 
 
 class AgentOrchestrator:
     """
     Main orchestrator that sets up and runs the email voice agent.
-    Coordinates between Pipecat pipeline and business logic.
+    Uses Pipecat's native function calling architecture.
     """
     
     def __init__(
         self,
         transport: BaseTransport,
         voice_interface: VoiceInterface,
-        conversation_manager: ConversationManager,
+        conversation_manager: AIConversationManager,
         enable_metrics: bool = False,
         enable_usage_metrics: bool = False
     ):
@@ -104,7 +39,7 @@ class AgentOrchestrator:
         Args:
             transport: Pipecat transport (WebRTC, WebSocket, etc.)
             voice_interface: Voice interface for STT/TTS
-            conversation_manager: Conversation management logic
+            conversation_manager: AI conversation management with function calling
             enable_metrics: Enable performance metrics
             enable_usage_metrics: Enable usage metrics
         """
@@ -117,27 +52,25 @@ class AgentOrchestrator:
         self.pipeline: Optional[Pipeline] = None
         self.task: Optional[PipelineTask] = None
         
-        logger.info("AgentOrchestrator initialized")
+        logger.info("AgentOrchestrator initialized with Pipecat function calling")
     
     def _build_pipeline(self) -> Pipeline:
-        """Build the Pipecat pipeline."""
-        # Get STT and TTS services from voice interface
+        """Build the Pipecat pipeline following the standard pattern."""
+        # Get services
         stt = self.voice_interface.get_stt_service()
         tts = self.voice_interface.get_tts_service()
+        llm = self.conversation_manager.get_llm_service()
+        context_aggregator = self.conversation_manager.get_context_aggregator()
         
-        # Create email agent processor
-        agent_processor = EmailAgentProcessor(
-            conversation_manager=self.conversation_manager,
-            name="email_agent"
-        )
-        
-        # Build pipeline
+        # Build standard Pipecat pipeline
         pipeline = Pipeline([
-            self.transport.input(),      # Audio input from user
-            stt,                         # Convert speech to text
-            agent_processor,             # Process with our agent logic
-            tts,                         # Convert response to speech
-            self.transport.output()      # Send audio back to user
+            self.transport.input(),           # Audio/video input
+            stt,                              # Speech to text
+            context_aggregator.user(),        # User context aggregation
+            llm,                              # LLM with function calling
+            tts,                              # Text to speech
+            self.transport.output(),          # Audio/video output
+            context_aggregator.assistant(),   # Assistant context aggregation
         ])
         
         return pipeline
@@ -161,6 +94,9 @@ class AgentOrchestrator:
             # Set up transport event handlers
             self._setup_event_handlers()
             
+            # Set up function call event handlers
+            self._setup_function_call_handlers()
+            
             logger.info("Orchestrator setup complete")
             
         except Exception as e:
@@ -175,14 +111,11 @@ class AgentOrchestrator:
             """Handle client connection."""
             logger.info(f"Client connected: {client}")
             
-            # IMPORTANT: Unmute the bot when client connects
+            # Unmute bot audio for Daily transport
             try:
-                # For Daily transport, we need to unmute
                 if hasattr(transport, 'client'):
-                    # Access the Daily client
                     daily_client = transport.client
                     
-                    # Update local participant (bot) to unmute audio
                     if hasattr(daily_client, 'update_inputs'):
                         await daily_client.update_inputs({
                             "microphone": True,
@@ -190,28 +123,20 @@ class AgentOrchestrator:
                         })
                         logger.info("Bot microphone unmuted")
                     
-                    # Alternative method for some Daily SDK versions
                     if hasattr(daily_client, 'set_local_audio'):
                         daily_client.set_local_audio(True)
-                        logger.info("Bot audio enabled via set_local_audio")
-                        
-                    # Also try updating participant
-                    if hasattr(daily_client, 'update_participant'):
-                        await daily_client.update_participant('local', {
-                            'setAudio': True
-                        })
-                        logger.info("Bot audio enabled via update_participant")
+                        logger.info("Bot audio enabled")
                         
             except Exception as e:
                 logger.error(f"Error unmuting bot: {e}")
             
             # Send welcome message
-            welcome_message = (
-                "Hello! I'm your email assistant. I can help you send emails, "
-                "read your inbox, or search for specific messages. "
-                "How can I help you today?"
-            )
-            await self.task.queue_frame(TTSSpeakFrame(welcome_message))
+            welcome_frame = await self.conversation_manager.add_welcome_message()
+            await self.task.queue_frame(welcome_frame)
+            
+            # Queue initial context to trigger greeting
+            context_aggregator = self.conversation_manager.get_context_aggregator()
+            await self.task.queue_frame(context_aggregator.user().get_context_frame())
         
         @self.transport.event_handler("on_client_disconnected")
         async def on_client_disconnected(transport, client):
@@ -227,23 +152,32 @@ class AgentOrchestrator:
         
         @self.transport.event_handler("on_user_started_speaking")
         async def on_user_started_speaking(transport):
-            """Handle user started speaking (for interruption)."""
+            """Handle user started speaking."""
             logger.debug("User started speaking")
-            # Could implement interruption logic here
         
         @self.transport.event_handler("on_user_stopped_speaking")
         async def on_user_stopped_speaking(transport):
             """Handle user stopped speaking."""
             logger.debug("User stopped speaking")
+    
+    def _setup_function_call_handlers(self):
+        """Set up event handlers for function calls."""
+        llm = self.conversation_manager.get_llm_service()
         
-        @self.transport.event_handler("on_participant_updated")
-        async def on_participant_updated(transport, participant):
-            """Handle participant updates - check audio state."""
-            logger.debug(f"Participant updated: {participant}")
+        @llm.event_handler("on_function_calls_started")
+        async def on_function_calls_started(service, function_calls):
+            """Handle when function calls start."""
+            logger.info(f"Function calls started: {[fc.name for fc in function_calls]}")
             
-            # Log audio state for debugging
-            if 'audio' in participant:
-                logger.info(f"Participant audio state: {participant['audio']}")
+            # Optionally provide feedback to user
+            await self.task.queue_frame(
+                TTSSpeakFrame("Let me handle that for you.")
+            )
+        
+        @llm.event_handler("on_function_calls_finished")
+        async def on_function_calls_finished(service, function_calls):
+            """Handle when function calls finish."""
+            logger.info(f"Function calls finished: {[fc.name for fc in function_calls]}")
     
     async def run(self):
         """Run the agent orchestrator."""
@@ -251,7 +185,7 @@ class AgentOrchestrator:
             await self.setup()
         
         try:
-            logger.info("Starting email voice agent...")
+            logger.info("Starting Pipecat email voice agent...")
             
             # Ensure transport is ready
             if hasattr(self.transport, 'ensure_connected'):
@@ -276,7 +210,7 @@ class AgentOrchestrator:
 
 
 class AgentOrchestratorFactory:
-    """Factory for creating agent orchestrators with different configurations."""
+    """Factory for creating agent orchestrators with Pipecat function calling."""
     
     @staticmethod
     def create_from_env(
@@ -294,12 +228,10 @@ class AgentOrchestratorFactory:
             Configured AgentOrchestrator instance
         """
         # Create services
-        intent_service = IntentRecognitionService()
         email_service = EmailService()
         
-        # Create conversation manager
-        conversation_manager = ConversationManager(
-            intent_service=intent_service,
+        # Create AI conversation manager with Pipecat function calling
+        conversation_manager = AIConversationManager(
             email_service=email_service
         )
         
