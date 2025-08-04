@@ -1,0 +1,13 @@
+[project]
+name = "orion-assistant"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dotenv>=0.9.9",
+    "fastapi>=0.116.1",
+    "loguru>=0.7.3",
+    "onnxruntime>=1.22.1",
+    "pipecat-ai[daily,google,runner,webrtc]>=0.0.77",
+]
