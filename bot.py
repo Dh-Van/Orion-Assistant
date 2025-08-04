@@ -13,6 +13,10 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.services.llm_service import FunctionCallParams
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
+
 
 
 dotenv.load_dotenv(".credentials.env")
@@ -28,6 +32,10 @@ transport_params = {
         vad_analyzer=SileroVADAnalyzer(),
     ),
 }
+
+async def get_last_name(params: FunctionCallParams):
+    first_name = params.arguments['first_name']
+    await params.result_callback(f'full name is {first_name} Shah')
 
 
 async def run_bot(transport: BaseTransport):
@@ -47,15 +55,36 @@ async def run_bot(transport: BaseTransport):
     llm = GoogleLLMService(
         api_key=os.getenv("GEMINI_API_KEY"), model="gemini-2.5-flash"
     )
+    
+    llm.register_function('get_last_name', get_last_name)
+    
+    @llm.event_handler('on_function_calls_started')
+    async def on_function_calls_started(service, function_calls):
+        logger.info('trued to call function')
+        # await tts.queue_frame(TTSpea)
+    
+    last_name_function = FunctionSchema(
+        name = 'get_last_name',
+        description = 'get last name based off of the first name',
+        properties={
+            'first_name': {
+                'type': 'string',
+                'description': 'First name of the user'
+            }
+        },
+        required=['first_name']
+    )
+    
+    tools = ToolsSchema(standard_tools=[last_name_function])
 
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so dont include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+            "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so dont include special characters in your answers. Respond to what the user said in a creative and helpful way. You have access to the get_last_name tool which can return the last name of the user based off of the first name",
         }
     ]
 
-    context = OpenAILLMContext(messages)
+    context = OpenAILLMContext(messages, tools)
     context_aggregator = llm.create_context_aggregator(context)
 
     pipeline = Pipeline(
